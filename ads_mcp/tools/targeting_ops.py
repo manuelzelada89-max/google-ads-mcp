@@ -66,6 +66,8 @@ def add_location_target(
     )
     criterion.negative = bool(exclude)
     if bid_modifier is not None:
+        if exclude:
+            raise ToolError("Excluded locations cannot have a bid modifier.")
         if float(bid_modifier) <= 0:
             raise ToolError("bid_modifier must be greater than 0.")
         criterion.bid_modifier = float(bid_modifier)
