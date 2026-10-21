@@ -37,6 +37,7 @@ ALL_CATEGORIES = [
     "keywords",
     "ads",
     "targeting",
+    "shared_sets",
 ]
 
 
