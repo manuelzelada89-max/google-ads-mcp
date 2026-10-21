@@ -119,3 +119,33 @@ def remove_shared_negative_keyword_list(
     op.remove = service.shared_set_path(customer_id, shared_set_id)
     response = mutate(service, "mutate_shared_sets", customer_id, [op])
     return {"resource_name": first_resource_name(response), "removed": True}
+
+
+@shared_sets_mcp.tool(
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True)
+)
+def remove_shared_negative_keyword(
+    customer_id: str | int,
+    shared_set_id: str | int,
+    criterion_id: str | int,
+    confirm_remove: bool = False,
+    login_customer_id: str | int | None = None,
+) -> Dict[str, Any]:
+    """Remove one keyword from a shared negative keyword list."""
+    if not confirm_remove:
+        raise ToolError(
+            "Removing a shared negative keyword requires confirm_remove=True."
+        )
+    customer_id = clean_id(customer_id)
+    shared_set_id = clean_id(shared_set_id)
+    criterion_id = clean_id(criterion_id)
+    c = client(login_customer_id)
+    service = c.get_service("SharedCriterionService")
+    op = c.get_type("SharedCriterionOperation")
+    op.remove = service.shared_criterion_path(
+        customer_id, shared_set_id, criterion_id
+    )
+    response = mutate(
+        service, "mutate_shared_criteria", customer_id, [op]
+    )
+    return {"resource_name": first_resource_name(response), "removed": True}
