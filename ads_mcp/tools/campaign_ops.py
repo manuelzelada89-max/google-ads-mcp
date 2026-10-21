@@ -207,6 +207,7 @@ def create_search_campaign(
     target_roas: float | None = None,
     include_search_partners: bool = False,
     include_display_network: bool = False,
+    contains_eu_political_advertising: bool = False,
     login_customer_id: str | int | None = None,
 ) -> Dict[str, Any]:
     """Create a Search campaign and its budget.
