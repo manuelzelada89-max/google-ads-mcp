@@ -396,3 +396,164 @@ def set_ad_group_audience_mode(
         "resource_name": first_resource_name(response),
         "audience_mode": mode,
     }
+
+
+@targeting_mcp.tool(annotations=ToolAnnotations(readOnlyHint=False))
+def set_campaign_geo_targeting_mode(
+    customer_id: str | int,
+    campaign_id: str | int,
+    positive_mode: str = "PRESENCE",
+    negative_mode: str = "PRESENCE",
+    login_customer_id: str | int | None = None,
+) -> Dict[str, Any]:
+    """Set campaign location presence/interest behavior.
+
+    positive_mode: PRESENCE, PRESENCE_OR_INTEREST, or SEARCH_INTEREST.
+    negative_mode: PRESENCE or PRESENCE_OR_INTEREST.
+    """
+    customer_id = clean_id(customer_id)
+    campaign_id = clean_id(campaign_id)
+    c = client(login_customer_id)
+    service = c.get_service("CampaignService")
+    op = c.get_type("CampaignOperation")
+    campaign = op.update
+    campaign.resource_name = service.campaign_path(
+        customer_id, campaign_id
+    )
+    campaign.geo_target_type_setting.positive_geo_target_type = enum_value(
+        c.enums.PositiveGeoTargetTypeEnum,
+        positive_mode,
+        ["PRESENCE", "PRESENCE_OR_INTEREST", "SEARCH_INTEREST"],
+    )
+    campaign.geo_target_type_setting.negative_geo_target_type = enum_value(
+        c.enums.NegativeGeoTargetTypeEnum,
+        negative_mode,
+        ["PRESENCE", "PRESENCE_OR_INTEREST"],
+    )
+    apply_mask(c, op, campaign)
+    response = mutate(service, "mutate_campaigns", customer_id, [op])
+    return {
+        "resource_name": first_resource_name(response),
+        "positive_mode": positive_mode.upper(),
+        "negative_mode": negative_mode.upper(),
+    }
+
+
+@targeting_mcp.tool(annotations=ToolAnnotations(readOnlyHint=False))
+def add_demographic_criterion(
+    customer_id: str | int,
+    ad_group_id: str | int,
+    dimension: str,
+    value: str,
+    exclude: bool = False,
+    bid_modifier: float | None = None,
+    login_customer_id: str | int | None = None,
+) -> Dict[str, Any]:
+    """Add age, gender, or household-income targeting to an ad group.
+
+    dimension must be AGE_RANGE, GENDER, or INCOME_RANGE.
+
+    AGE_RANGE values: AGE_RANGE_18_24, AGE_RANGE_25_34,
+    AGE_RANGE_35_44, AGE_RANGE_45_54, AGE_RANGE_55_64,
+    AGE_RANGE_65_UP, AGE_RANGE_UNDETERMINED.
+
+    GENDER values: MALE, FEMALE, UNDETERMINED.
+
+    INCOME_RANGE values: INCOME_RANGE_0_50, INCOME_RANGE_50_60,
+    INCOME_RANGE_60_70, INCOME_RANGE_70_80, INCOME_RANGE_80_90,
+    INCOME_RANGE_90_UP, INCOME_RANGE_UNDETERMINED.
+    """
+    customer_id = clean_id(customer_id)
+    ad_group_id = clean_id(ad_group_id)
+    dimension = str(dimension).strip().upper()
+    value = str(value).strip().upper()
+    c = client(login_customer_id)
+    service = c.get_service("AdGroupCriterionService")
+    ad_group_service = c.get_service("AdGroupService")
+    op = c.get_type("AdGroupCriterionOperation")
+    criterion = op.create
+    criterion.ad_group = ad_group_service.ad_group_path(
+        customer_id, ad_group_id
+    )
+    criterion.negative = bool(exclude)
+
+    if dimension == "AGE_RANGE":
+        allowed = [
+            "AGE_RANGE_18_24",
+            "AGE_RANGE_25_34",
+            "AGE_RANGE_35_44",
+            "AGE_RANGE_45_54",
+            "AGE_RANGE_55_64",
+            "AGE_RANGE_65_UP",
+            "AGE_RANGE_UNDETERMINED",
+        ]
+        criterion.age_range.type_ = enum_value(
+            c.enums.AgeRangeTypeEnum, value, allowed
+        )
+    elif dimension == "GENDER":
+        criterion.gender.type_ = enum_value(
+            c.enums.GenderTypeEnum,
+            value,
+            ["MALE", "FEMALE", "UNDETERMINED"],
+        )
+    elif dimension == "INCOME_RANGE":
+        allowed = [
+            "INCOME_RANGE_0_50",
+            "INCOME_RANGE_50_60",
+            "INCOME_RANGE_60_70",
+            "INCOME_RANGE_70_80",
+            "INCOME_RANGE_80_90",
+            "INCOME_RANGE_90_UP",
+            "INCOME_RANGE_UNDETERMINED",
+        ]
+        criterion.income_range.type_ = enum_value(
+            c.enums.IncomeRangeTypeEnum, value, allowed
+        )
+    else:
+        raise ToolError(
+            "dimension must be AGE_RANGE, GENDER, or INCOME_RANGE."
+        )
+
+    if bid_modifier is not None:
+        if float(bid_modifier) <= 0:
+            raise ToolError("bid_modifier must be greater than 0.")
+        criterion.bid_modifier = float(bid_modifier)
+
+    response = mutate(
+        service, "mutate_ad_group_criteria", customer_id, [op]
+    )
+    return {
+        "resource_name": first_resource_name(response),
+        "dimension": dimension,
+        "value": value,
+        "excluded": bool(exclude),
+        "bid_modifier": bid_modifier,
+    }
+
+
+@targeting_mcp.tool(
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True)
+)
+def remove_ad_group_criterion(
+    customer_id: str | int,
+    ad_group_id: str | int,
+    criterion_id: str | int,
+    confirm_remove: bool = False,
+    login_customer_id: str | int | None = None,
+) -> Dict[str, Any]:
+    """Remove a non-keyword ad-group criterion such as an audience or demographic."""
+    if not confirm_remove:
+        raise ToolError("Removing a criterion requires confirm_remove=True.")
+    customer_id = clean_id(customer_id)
+    ad_group_id = clean_id(ad_group_id)
+    criterion_id = clean_id(criterion_id)
+    c = client(login_customer_id)
+    service = c.get_service("AdGroupCriterionService")
+    op = c.get_type("AdGroupCriterionOperation")
+    op.remove = service.ad_group_criterion_path(
+        customer_id, ad_group_id, criterion_id
+    )
+    response = mutate(
+        service, "mutate_ad_group_criteria", customer_id, [op]
+    )
+    return {"resource_name": first_resource_name(response), "removed": True}
