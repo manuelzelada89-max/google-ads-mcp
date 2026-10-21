@@ -177,14 +177,14 @@ def update_bidding_strategy(
         campaign.target_spend.target_spend_micros = 0
     elif strategy == "MAXIMIZE_CONVERSIONS":
         campaign.maximize_conversions.target_cpa_micros = (
-            money_to_micros(target_cpa) if target_cpa is not None else 0
+            money_to_micros(target_cpa) if target_cpa is not None else None
         )
     elif strategy == "MAXIMIZE_CONVERSION_VALUE":
         campaign.maximize_conversion_value.target_roas = (
-            float(target_roas) if target_roas is not None else 0
+            float(target_roas) if target_roas is not None else None
         )
     elif strategy == "MANUAL_CPC":
-        campaign.manual_cpc.enhanced_cpc_enabled = False
+        campaign.manual_cpc = c.get_type("ManualCpc")
 
     apply_mask(c, op, campaign)
     response = mutate(service, "mutate_campaigns", customer_id, [op])
@@ -256,19 +256,22 @@ def create_search_campaign(
     campaign.network_settings.target_content_network = bool(
         include_display_network
     )
+    campaign.contains_eu_political_advertising = (
+        c.enums.EuPoliticalAdvertisingStatusEnum.DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING
+    )
 
     if strategy == "MAXIMIZE_CLICKS":
         campaign.target_spend.target_spend_micros = 0
     elif strategy == "MAXIMIZE_CONVERSIONS":
         campaign.maximize_conversions.target_cpa_micros = (
-            money_to_micros(target_cpa) if target_cpa is not None else 0
+            money_to_micros(target_cpa) if target_cpa is not None else None
         )
     elif strategy == "MAXIMIZE_CONVERSION_VALUE":
         campaign.maximize_conversion_value.target_roas = (
-            float(target_roas) if target_roas is not None else 0
+            float(target_roas) if target_roas is not None else None
         )
     elif strategy == "MANUAL_CPC":
-        campaign.manual_cpc.enhanced_cpc_enabled = False
+        campaign.manual_cpc = c.get_type("ManualCpc")
 
     response = mutate(service, "mutate_campaigns", customer_id, [op])
     return {
