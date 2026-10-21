@@ -11,3 +11,4 @@ namespaces:
   keywords: true
   ads: true
   targeting: true
+  shared_sets: true
