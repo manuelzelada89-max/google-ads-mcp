@@ -28,7 +28,16 @@ DEFAULT_CONFIG_FILE = "tools_config.yaml"
 CONFIG_PATH_ENV_VAR = "GOOGLE_ADS_MCP_TOOLS_CONFIG"
 
 # Default categories that are supported by the server
-ALL_CATEGORIES = ["customers", "search", "metadata"]
+ALL_CATEGORIES = [
+    "customers",
+    "search",
+    "metadata",
+    "campaigns",
+    "ad_groups",
+    "keywords",
+    "ads",
+    "targeting",
+]
 
 
 class ToolsConfig:
