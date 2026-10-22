@@ -220,10 +220,17 @@ def gtm_prepare_change(account_id: str, container_id: str, workspace_id: str,
         path += f"/{_id(entity_id)}"
         current = _gtm("GET", path)
     if operation in ("create", "update"):
-        if not isinstance(entity, dict) or not entity.get("name") or not entity.get("type"):
-            raise ToolError("entity requiere como mínimo name y type")
-        entity = dict(entity)
+        if not isinstance(entity, dict) or not entity:
+            raise ToolError("entity debe ser un objeto no vacío")
+        if operation == "create" and (not entity.get("name") or not entity.get("type")):
+            raise ToolError("CREATE requiere name y type")
+        # GTM PUT replaces the whole resource. Preserve fields omitted by
+        # the caller instead of accidentally wiping triggers/parameters.
+        entity = {**current, **entity} if operation == "update" else dict(entity)
         if operation == "update":
+            for fixed in ("path", "accountId", "containerId", "workspaceId"):
+                if fixed in current:
+                    entity[fixed] = current[fixed]
             entity["fingerprint"] = current.get("fingerprint")
             # The API requires existing identity; do not let a payload replace it.
             id_key = {"tags": "tagId", "triggers": "triggerId", "variables": "variableId"}[entity_type]
