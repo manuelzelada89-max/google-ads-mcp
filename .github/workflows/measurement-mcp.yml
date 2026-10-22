@@ -1,0 +1,80 @@
+name: Measurement MCP checks
+
+on:
+  pull_request:
+    paths:
+      - 'measurement_mcp/**'
+      - 'Dockerfile.measurement'
+      - 'cloudbuild.measurement.yaml'
+      - '.github/workflows/measurement-mcp.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-and-import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile standalone MCP
+        run: python -m compileall -q measurement_mcp
+      - name: Validate deployment script
+        run: bash -n deploy_measurement.sh
+      - name: Build the dedicated Cloud Run container
+        run: docker build -f Dockerfile.measurement -t measurement-mcp-check .
+      - name: Install pinned runtime dependencies
+        run: |
+          pip install "fastmcp==4.1.3" "py-key-value-aio[firestore]>=0.4.5,<0.5.0" "requests>=2.32,<3"
+      - name: Import and validate registered tools
+        run: |
+          python - <<'PY'
+          from measurement_mcp import server
+          import inspect
+          tools = [name for name, obj in vars(server).items()
+                   if callable(obj) and inspect.isfunction(obj) and
+                   name.startswith(("gtm_", "ga4_"))]
+          assert len(tools) >= 19, tools
+          assert callable(server.main)
+          print("Measurement MCP tools:", len(tools), ", ".join(sorted(tools)))
+          PY
+      - name: Check OAuth collection isolation (offline)
+        env:
+          MEASUREMENT_MCP_JWT_SIGNING_KEY: test-only-signing-key-longer-than-32-characters
+          MEASUREMENT_MCP_STORAGE_TYPE: memory
+        run: |
+          python - <<'PY'
+          import asyncio
+          from measurement_mcp.storage import create_client_storage
+
+          async def test():
+              scoped_store = create_client_storage()
+              await scoped_store.put(key="chatgpt-client", value={"ok": True}, collection="mcp-oauth-proxy-clients")
+              same = await scoped_store.get(key="chatgpt-client", collection="mcp-oauth-proxy-clients")
+              assert same == {"ok": True}, same
+              root = scoped_store.key_value.key_value
+              original_collection = await root.get(key="chatgpt-client", collection="mcp-oauth-proxy-clients")
+              assert original_collection is None, "Client registrations leaked into Ads namespace"
+              # The wrapper chooses its own delimiter/normalization; the
+              # invariant is that no raw/unprefixed collection is written.
+              print("OAuth namespaces isolated; encrypted state round trips")
+          asyncio.run(test())
+          PY
+      - name: Validate preview signing (offline)
+        env:
+          MEASUREMENT_MCP_APPROVAL_KEY: test-only-signing-key-longer-than-32-characters
+        run: |
+          python - <<'PY'
+          from measurement_mcp.server import _make_ticket, _decode_ticket
+          ticket = _make_ticket({"category": "gtm_entity", "operation": "create"})
+          assert _decode_ticket(ticket, "gtm_entity")["operation"] == "create"
+          try:
+              _decode_ticket(ticket, "ga4_key_event")
+          except Exception:
+              print("Cross-tool replay blocked")
+          else:
+              raise AssertionError("Expected scope validation")
+          PY

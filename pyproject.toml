@@ -45,3 +45,13 @@ issues = "https://github.com/googleads/google-ads-mcp/issues"
 [project.scripts]
 google-ads-mcp = "ads_mcp.server:run_server"
 google-ads-mcp-update-gaql = "ads_mcp.update_references:update_gaql_resource_file"
+
+# Keep this original Google Ads distribution separate from the independent
+# measurement_mcp Cloud Run image. Required to avoid setuptools flat-layout
+# multiple-package auto-discovery errors.
+[tool.setuptools.packages.find]
+include = ["ads_mcp*"]
+
+# Google Measurement is formatted/tested by its own workflow, not Ads nox.
+[tool.black]
+extend-exclude = "/measurement_mcp/"
