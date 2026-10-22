@@ -34,6 +34,19 @@ def create_client_storage() -> Any:
     if not secret:
         raise RuntimeError("OAuth store encryption requires JWT_SIGNING_KEY or a dedicated key")
 
+    # IMPORTANT: The existing Google Ads MCP shares the same Firestore
+    # database, but uses a different Fernet key. OAuthProxy uses common
+    # collection names across server instances. Without a namespace the
+    # servers can overwrite each other's client registrations, yielding
+    # "Client Not Registered" after a reconnect or a Cloud Run cold start.
+    # Prefix the collections before encryption; no existing Ads data is touched.
+    from key_value.aio.wrappers.prefix_collections import PrefixCollectionsWrapper
+
+    store = PrefixCollectionsWrapper(
+        key_value=store,
+        prefix="google-measurement-mcp",
+    )
+
     from cryptography.fernet import Fernet
     from key_value.aio.wrappers.encryption.fernet import FernetEncryptionWrapper
     from fastmcp.server.auth.oauth_proxy.proxy import derive_jwt_key
@@ -48,5 +61,7 @@ def create_client_storage() -> Any:
     return FernetEncryptionWrapper(
         key_value=store,
         fernet=key,
-        raise_on_decryption_error=False,
+        # Fail visibly instead of treating unreadable OAuth registrations
+        # as missing. With isolated collections this should never occur.
+        raise_on_decryption_error=True,
     )
