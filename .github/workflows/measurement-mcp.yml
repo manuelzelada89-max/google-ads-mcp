@@ -41,6 +41,27 @@ jobs:
           assert callable(server.main)
           print("Measurement MCP tools:", len(tools), ", ".join(sorted(tools)))
           PY
+      - name: Check OAuth collection isolation (offline)
+        env:
+          MEASUREMENT_MCP_JWT_SIGNING_KEY: test-only-signing-key-longer-than-32-characters
+          MEASUREMENT_MCP_STORAGE_TYPE: memory
+        run: |
+          python - <<'PY'
+          import asyncio
+          from measurement_mcp.storage import create_client_storage
+
+          async def test():
+              scoped_store = create_client_storage()
+              await scoped_store.put(key="chatgpt-client", value={"ok": True}, collection="mcp-oauth-proxy-clients")
+              same = await scoped_store.get(key="chatgpt-client", collection="mcp-oauth-proxy-clients")
+              assert same == {"ok": True}, same
+              root = scoped_store.key_value.key_value
+              original_collection = await root.get(key="chatgpt-client", collection="mcp-oauth-proxy-clients")
+              assert original_collection is None, "Client registrations leaked into Ads namespace"
+              assert await root.get(key="chatgpt-client", collection="google-measurement-mcp:mcp-oauth-proxy-clients") is not None
+              print("OAuth namespaces isolated; encrypted state round trips")
+          asyncio.run(test())
+          PY
       - name: Validate preview signing (offline)
         env:
           MEASUREMENT_MCP_APPROVAL_KEY: test-only-signing-key-longer-than-32-characters
