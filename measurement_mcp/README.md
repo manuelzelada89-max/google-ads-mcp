@@ -51,6 +51,22 @@ https://www.googleapis.com/auth/analytics.edit
 
 ## Deploy from Cloud Shell
 
+**Fastest path (single paste in Cloud Shell):**
+
+```bash
+git clone --branch feature/gtm-ga4-write-mcp-20261021 --single-branch https://github.com/manuelzelada89-max/google-ads-mcp.git ~/measurement-mcp-setup && cd ~/measurement-mcp-setup && bash deploy_measurement.sh
+```
+
+The script reads the existing `google-ads-mcp-manuel` Cloud Run configuration
+(without changing that service), builds an independent image, provisions
+separate signing secrets, deploys `google-measurement-mcp` and prints the
+OAuth redirect and ChatGPT MCP URL. It requires your normal gcloud permissions.
+**The script cannot update Google's OAuth Web Application's authorized
+redirect URI**; add the printed `https://.../auth/callback` to its existing
+OAuth Client in Google Cloud Console and add the requested GTM/GA4 scopes.
+
+### Manual alternative
+
 ```bash
 gcloud config set project neural-cairn-506003-t5
 gcloud services enable tagmanager.googleapis.com analyticsadmin.googleapis.com analyticsdata.googleapis.com run.googleapis.com cloudbuild.googleapis.com
