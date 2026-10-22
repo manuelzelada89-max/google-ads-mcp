@@ -22,6 +22,10 @@ jobs:
           python-version: '3.11'
       - name: Compile standalone MCP
         run: python -m compileall -q measurement_mcp
+      - name: Validate deployment script
+        run: bash -n deploy_measurement.sh
+      - name: Build the dedicated Cloud Run container
+        run: docker build -f Dockerfile.measurement -t measurement-mcp-check .
       - name: Install pinned runtime dependencies
         run: |
           pip install "fastmcp==4.1.3" "py-key-value-aio[firestore]>=0.4.5,<0.5.0" "requests>=2.32,<3"
