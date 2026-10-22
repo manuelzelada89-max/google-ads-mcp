@@ -1,0 +1,14 @@
+# Build this MCP without modifying the Google Ads image.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file
+      - Dockerfile.measurement
+      - --tag
+      - us-central1-docker.pkg.dev/neural-cairn-506003-t5/mcp-servers/google-measurement-mcp:latest
+      - .
+images:
+  - us-central1-docker.pkg.dev/neural-cairn-506003-t5/mcp-servers/google-measurement-mcp:latest
+options:
+  logging: CLOUD_LOGGING_ONLY
