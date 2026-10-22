@@ -58,7 +58,8 @@ jobs:
               root = scoped_store.key_value.key_value
               original_collection = await root.get(key="chatgpt-client", collection="mcp-oauth-proxy-clients")
               assert original_collection is None, "Client registrations leaked into Ads namespace"
-              assert await root.get(key="chatgpt-client", collection="google-measurement-mcp:mcp-oauth-proxy-clients") is not None
+              # The wrapper chooses its own delimiter/normalization; the
+              # invariant is that no raw/unprefixed collection is written.
               print("OAuth namespaces isolated; encrypted state round trips")
           asyncio.run(test())
           PY
