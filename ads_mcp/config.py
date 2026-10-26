@@ -38,6 +38,7 @@ ALL_CATEGORIES = [
     "ads",
     "targeting",
     "shared_sets",
+    "keyword_planner",
 ]
 
 
@@ -59,8 +60,6 @@ class ToolsConfig:
 
         Returns the resolved path, or ``None`` if no config file can be found.
         """
-        # 1 & 2: an explicitly requested config must exist; otherwise it is a
-        # user error and we surface it rather than silently falling back.
         explicit = filepath or os.environ.get(CONFIG_PATH_ENV_VAR)
         if explicit:
             if not os.path.exists(explicit):
@@ -69,12 +68,9 @@ class ToolsConfig:
                 )
             return explicit
 
-        # 3: a config file in the working directory acts as a user override.
         if os.path.exists(DEFAULT_CONFIG_FILE):
             return DEFAULT_CONFIG_FILE
 
-        # 4: fall back to the default config bundled with the package so that
-        # installed deployments (e.g. ``pipx run``) work without extra setup.
         bundled = importlib.resources.files("ads_mcp").joinpath(
             DEFAULT_CONFIG_FILE
         )
@@ -89,13 +85,7 @@ class ToolsConfig:
 
     @classmethod
     def load(cls, filepath: str | None = None) -> "ToolsConfig":
-        """Loads configuration from a YAML file.
-
-        Resolves the config path (explicit argument, ``GOOGLE_ADS_MCP_TOOLS_CONFIG``
-        env var, working-directory file, then the bundled default). Raises if a
-        resolved file is missing or corrupt. If no config can be resolved at all,
-        falls back to enabling all default tool namespaces.
-        """
+        """Loads configuration from a YAML file."""
         resolved = cls._resolve_config_path(filepath)
         if resolved is None:
             logger.warning(
@@ -122,7 +112,6 @@ class ToolsConfig:
         """Determines if a tool category/namespace is enabled."""
         namespaces = self._config.get("namespaces", {})
         if not namespaces:
-            # By default, if no config is specified, all known categories are enabled
             return category in ALL_CATEGORIES
 
         category_config = namespaces.get(category)
@@ -141,10 +130,7 @@ class ToolsConfig:
         return False
 
     def get_namespace_prefix(self, category: str) -> str | None:
-        """Returns the prefix/namespace to use for the category.
-
-        Returns None if no prefix should be applied.
-        """
+        """Returns the prefix/namespace to use for the category."""
         namespaces = self._config.get("namespaces", {})
         if not namespaces:
             return category
@@ -154,10 +140,8 @@ class ToolsConfig:
             return category_config
 
         if isinstance(category_config, dict):
-            # If explicit prefix is given, use it
             if "prefix" in category_config:
                 return category_config["prefix"]
-            # Default to category name if enabled_tools dict is provided
             return category
 
         if category_config is True:
@@ -176,19 +160,12 @@ class ToolsConfig:
 
         category_config = namespaces.get(category)
         if not isinstance(category_config, dict):
-            # If category is enabled as a simple boolean or string, all tools in it are enabled
             return True
 
         enabled_tools = category_config.get("enabled_tools")
         if enabled_tools is None:
-            # No explicit enabled_tools filter means all are enabled
             return True
 
-        # Handle list of dictionaries or list of strings
-        # Format from proposal:
-        # enabled_tools:
-        #   - create_asset: true
-        #   - upload_video: true
         if isinstance(enabled_tools, list):
             for item in enabled_tools:
                 if isinstance(item, dict):
